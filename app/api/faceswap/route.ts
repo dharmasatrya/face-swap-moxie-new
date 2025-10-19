@@ -1,5 +1,5 @@
 // ============================================
-// app/api/faceswap/route.ts - Updated with Correct Replicate API
+// app/api/faceswap/route.ts - Using Public URLs
 // ============================================
 import { NextRequest, NextResponse } from 'next/server';
 import Replicate from 'replicate';
@@ -14,8 +14,8 @@ const replicate = new Replicate({
 });
 
 interface FaceSwapRequest {
-  swap_image: string;  // User's face (base64 data URI)
-  input_image: string; // Activity base image (base64 data URI)
+  swap_image: string;  // User's face URL (from Vercel Blob)
+  input_image: string; // Activity image URL (from public folder)
 }
 
 export async function POST(request: NextRequest) {
@@ -30,17 +30,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('🔄 Starting face swap...');
-    console.log('👤 User face length:', swap_image.substring(0, 50) + '...');
-    console.log('🎯 Target image length:', input_image.substring(0, 50) + '...');
+    // Get the full URL for the activity image
+    const baseUrl = request.nextUrl.origin;
+    const fullInputImageUrl = input_image.startsWith('http') 
+      ? input_image 
+      : `${baseUrl}${input_image}`;
 
-    // Run face swap using replicate.run() as per official API
+    console.log('🔄 Starting face swap...');
+    console.log('👤 User face URL:', swap_image);
+    console.log('🎯 Target image URL:', fullInputImageUrl);
+
+    // Run face swap using replicate.run() with public URLs
     const output = await replicate.run(
       "cdingram/face-swap:d1d6ea8c8be89d664a07a457526f7128109dee7030fdac424788d762c71ed111",
       {
         input: {
-          swap_image,   // person whose face will be transferred (base64)
-          input_image,  // base/body image to receive the face (base64)
+          swap_image,          // User's uploaded selfie (from Vercel Blob)
+          input_image: fullInputImageUrl,  // Activity image (from public folder)
         },
       }
     );

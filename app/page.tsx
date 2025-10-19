@@ -35,41 +35,57 @@ export default function Home() {
     setError(null)
 
     try {
-      // Convert base64 images to data URIs for Replicate
-      const userPhotoBase64 = data.photo // This is already base64
+      // Step 1: Upload user's selfie to get a public URL
+      const formData = new FormData()
       
-      // Fetch activity image and convert to base64
+      // Convert base64 to blob
+      if (data.photo) {
+        const response = await fetch(data.photo)
+        const blob = await response.blob()
+        formData.append('selfie', blob, 'selfie.jpg')
+      }
+
+      const uploadResponse = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload photo')
+      }
+
+      const { selfieUrl } = await uploadResponse.json()
+
+      // Step 2: Get activity image URL (these are already public)
       const activityImageMap: Record<string, string> = {
         padel: '/padel.png',
         pilates: '/pilates.png',
       }
 
-      const activityImagePath = activityImageMap[selectedActivity || 'padel']
-      const activityImageResponse = await fetch(activityImagePath)
-      const activityImageBlob = await activityImageResponse.blob()
-      
-      // Convert activity image to base64
-      const activityImageBase64 = await new Promise<string>((resolve) => {
-        const reader = new FileReader()
-        reader.onloadend = () => resolve(reader.result as string)
-        reader.readAsDataURL(activityImageBlob)
-      })
+      const activityImageUrl = activityImageMap[selectedActivity || 'padel']
 
-      // Perform face swap with base64 images
+      // Step 3: Perform face swap with PUBLIC URLs
       const faceSwapResponse = await fetch('/api/faceswap', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          swap_image: userPhotoBase64, // User's selfie (face source)
-          input_image: activityImageBase64, // Activity image (body target)
+          swap_image: selfieUrl, // User's selfie URL (uploaded to Vercel Blob)
+          input_image: activityImageUrl, // Activity image URL (from public folder)
         }),
       })
 
       if (!faceSwapResponse.ok) {
-        const errorData = await faceSwapResponse.json()
-        throw new Error(errorData.error || 'Face swap processing failed')
+        const errorText = await faceSwapResponse.text()
+        let errorMessage = 'Face swap processing failed'
+        try {
+          const errorData = JSON.parse(errorText)
+          errorMessage = errorData.details || errorData.error || errorMessage
+        } catch {
+          errorMessage = errorText || errorMessage
+        }
+        throw new Error(errorMessage)
       }
 
       const { url } = await faceSwapResponse.json()
