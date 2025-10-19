@@ -1,35 +1,33 @@
 // ============================================
-// app/api/faceswap/route.ts
-// POST /api/faceswap - Face swap processing endpoint
+// app/api/faceswap/route.ts - Updated
 // ============================================
 import { NextRequest, NextResponse } from 'next/server';
 import Replicate from 'replicate';
-import { readFile } from 'fs/promises';
-import path from 'path';
 
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
 });
 
 interface FaceSwapRequest {
-  swap_image: string;
+  swap_image: string;  // User's face URL
+  input_image: string; // Activity base image URL
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body: FaceSwapRequest = await request.json();
-    const { swap_image } = body;
+    const { swap_image, input_image } = body;
 
-    if (!swap_image) {
+    if (!swap_image || !input_image) {
       return NextResponse.json(
-        { error: 'Missing swap_image' },
+        { error: 'Missing swap_image or input_image' },
         { status: 400 }
       );
     }
 
-    // Read the input image
-    const imagePath = path.join(process.cwd(), 'public', 'uploads', 'image.png');
-    const input_image = await readFile(imagePath);
+    console.log('🔄 Starting face swap...');
+    console.log('👤 User face:', swap_image);
+    console.log('🎯 Target image:', input_image);
 
     // Run face swap
     const output = await replicate.run(
@@ -45,19 +43,24 @@ export async function POST(request: NextRequest) {
     console.log('✅ Raw AI Output:', output);
 
     // Handle different output formats
-    const urlObject = typeof output === 'object' && output !== null 
-      ? (output as any).url?.() || (output as any).url 
-      : output;
-    const resultUrl = urlObject?.href || output || null;
+    let resultUrl: string | null = null;
+    
+    if (typeof output === 'string') {
+      resultUrl = output;
+    } else if (output && typeof output === 'object') {
+      const urlObject = (output as any).url?.() || (output as any).url;
+      resultUrl = urlObject?.href || urlObject || null;
+    }
 
     if (resultUrl) {
       console.log('✅ Output URL:', resultUrl);
       return NextResponse.json({ url: resultUrl });
     } else {
+      console.error('❌ Unexpected output format:', output);
       return NextResponse.json({ 
-        message: 'Unexpected output format', 
+        error: 'Unexpected output format', 
         output 
-      });
+      }, { status: 500 });
     }
 
   } catch (err) {

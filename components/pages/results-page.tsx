@@ -1,3 +1,6 @@
+// ============================================
+// components/pages/results-page.tsx - Updated
+// ============================================
 "use client"
 
 import { Card } from "@/components/ui/card"
@@ -10,10 +13,11 @@ interface ResultsPageProps {
     gender: string
     photo: string | null
   }
+  swappedImageUrl: string | null
   onReplay: () => void
 }
 
-export default function ResultsPage({ activity, userData, onReplay }: ResultsPageProps) {
+export default function ResultsPage({ activity, userData, swappedImageUrl, onReplay }: ResultsPageProps) {
   const activityTitles: Record<string, string> = {
     padel: "Siap Padel Bersama Yakult!",
     pilates: "Pilates Pro Bareng Yakult!",
@@ -24,8 +28,24 @@ export default function ResultsPage({ activity, userData, onReplay }: ResultsPag
     pilates: "🧘",
   }
 
-  const handleSaveImage = () => {
-    alert("Gambar berhasil disimpan!")
+  const handleSaveImage = async () => {
+    if (!swappedImageUrl) return
+    
+    try {
+      const response = await fetch(swappedImageUrl)
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `yakult-${activity}-${Date.now()}.jpg`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Error saving image:', error)
+      alert('Gagal menyimpan gambar')
+    }
   }
 
   const handleMoreDetails = () => {
@@ -40,11 +60,11 @@ export default function ResultsPage({ activity, userData, onReplay }: ResultsPag
           <div className="bg-gradient-to-br from-yakult-red to-yakult-red-dark p-8 md:p-12 text-center relative">
             <div className="absolute top-4 right-4 text-4xl opacity-20">{activityEmojis[activity || "padel"]}</div>
 
-            {userData.photo && (
+            {swappedImageUrl && (
               <img
-                src={userData.photo || "/placeholder.svg"}
-                alt="Result"
-                className="w-48 h-48 rounded-2xl object-cover mx-auto mb-6 border-4 border-white shadow-lg"
+                src={swappedImageUrl}
+                alt="Face Swapped Result"
+                className="w-full max-w-md rounded-2xl object-cover mx-auto mb-6 border-4 border-white shadow-lg"
               />
             )}
 
