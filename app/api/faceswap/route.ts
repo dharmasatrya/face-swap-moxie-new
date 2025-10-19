@@ -1,16 +1,21 @@
 // ============================================
-// app/api/faceswap/route.ts - Updated
+// app/api/faceswap/route.ts - Updated with Correct Replicate API
 // ============================================
 import { NextRequest, NextResponse } from 'next/server';
 import Replicate from 'replicate';
+
+// Verify API token is loaded
+if (!process.env.REPLICATE_API_TOKEN) {
+  console.error('❌ REPLICATE_API_TOKEN is not set in environment variables');
+}
 
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
 });
 
 interface FaceSwapRequest {
-  swap_image: string;  // User's face URL
-  input_image: string; // Activity base image URL
+  swap_image: string;  // User's face (base64 data URI)
+  input_image: string; // Activity base image (base64 data URI)
 }
 
 export async function POST(request: NextRequest) {
@@ -26,41 +31,35 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('🔄 Starting face swap...');
-    console.log('👤 User face:', swap_image);
-    console.log('🎯 Target image:', input_image);
+    console.log('👤 User face length:', swap_image.substring(0, 50) + '...');
+    console.log('🎯 Target image length:', input_image.substring(0, 50) + '...');
 
-    // Run face swap
+    // Run face swap using replicate.run() as per official API
     const output = await replicate.run(
-      'cdingram/face-swap:d1d6ea8c8be89d664a07a457526f7128109dee7030fdac424788d762c71ed111',
+      "cdingram/face-swap:d1d6ea8c8be89d664a07a457526f7128109dee7030fdac424788d762c71ed111",
       {
         input: {
-          swap_image,   // person whose face will be transferred
-          input_image,  // base/body image to receive the face
+          swap_image,   // person whose face will be transferred (base64)
+          input_image,  // base/body image to receive the face (base64)
         },
       }
     );
 
     console.log('✅ Raw AI Output:', output);
 
-    // Handle different output formats
-    let resultUrl: string | null = null;
-    
-    if (typeof output === 'string') {
-      resultUrl = output;
-    } else if (output && typeof output === 'object') {
-      const urlObject = (output as any).url?.() || (output as any).url;
-      resultUrl = urlObject?.href || urlObject || null;
-    }
+    // Handle output according to official API reference
+    const urlObject = (output as any)?.url?.() || (output as any)?.url;
+    const resultUrl = urlObject?.href || urlObject || output || null;
 
-    if (resultUrl) {
+    if (resultUrl && typeof resultUrl === 'string') {
       console.log('✅ Output URL:', resultUrl);
       return NextResponse.json({ url: resultUrl });
     } else {
-      console.error('❌ Unexpected output format:', output);
+      console.log('⚠️ Unexpected output format, returning raw output');
       return NextResponse.json({ 
-        error: 'Unexpected output format', 
-        output 
-      }, { status: 500 });
+        message: 'Unexpected output format', 
+        output
+      });
     }
 
   } catch (err) {

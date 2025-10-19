@@ -1,5 +1,5 @@
 // ============================================
-// app/page.tsx - Updated with API Integration
+// app/page.tsx - Updated with API Integration (NO UPLOAD NEEDED)
 // ============================================
 "use client"
 
@@ -35,48 +35,41 @@ export default function Home() {
     setError(null)
 
     try {
-      // Step 1: Upload the user's selfie
-      const formData = new FormData()
+      // Convert base64 images to data URIs for Replicate
+      const userPhotoBase64 = data.photo // This is already base64
       
-      // Convert base64 to blob
-      if (data.photo) {
-        const response = await fetch(data.photo)
-        const blob = await response.blob()
-        formData.append('selfie', blob, 'selfie.jpg')
-      }
-
-      const uploadResponse = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (!uploadResponse.ok) {
-        throw new Error('Failed to upload photo')
-      }
-
-      const { selfieUrl } = await uploadResponse.json()
-
-      // Step 2: Perform face swap
+      // Fetch activity image and convert to base64
       const activityImageMap: Record<string, string> = {
         padel: '/padel.png',
         pilates: '/pilates.png',
       }
 
-      const swapImageUrl = activityImageMap[selectedActivity || 'padel']
+      const activityImagePath = activityImageMap[selectedActivity || 'padel']
+      const activityImageResponse = await fetch(activityImagePath)
+      const activityImageBlob = await activityImageResponse.blob()
+      
+      // Convert activity image to base64
+      const activityImageBase64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.readAsDataURL(activityImageBlob)
+      })
 
+      // Perform face swap with base64 images
       const faceSwapResponse = await fetch('/api/faceswap', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          swap_image: `${window.location.origin}${selfieUrl}`, // User's selfie (face source)
-          input_image: `${window.location.origin}${swapImageUrl}`, // Activity image (body target)
+          swap_image: userPhotoBase64, // User's selfie (face source)
+          input_image: activityImageBase64, // Activity image (body target)
         }),
       })
 
       if (!faceSwapResponse.ok) {
-        throw new Error('Face swap processing failed')
+        const errorData = await faceSwapResponse.json()
+        throw new Error(errorData.error || 'Face swap processing failed')
       }
 
       const { url } = await faceSwapResponse.json()
