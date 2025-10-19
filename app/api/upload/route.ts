@@ -27,9 +27,13 @@ export async function POST(request: NextRequest) {
       console.log('✅ File converted to data URL (local dev)');
       return NextResponse.json({ selfieUrl: dataUrl });
     } else {
-      // For production, upload to Vercel Blob Storage
-      const blob = await put(file.name, file, {
+      // For production, upload to Vercel Blob Storage with unique filename
+      const timestamp = Date.now();
+      const filename = `selfie-${timestamp}-${file.name}`;
+      
+      const blob = await put(filename, file, {
         access: 'public',
+        addRandomSuffix: true, // Adds random suffix to prevent conflicts
       });
 
       console.log('✅ File uploaded to Vercel Blob:', blob.url);
